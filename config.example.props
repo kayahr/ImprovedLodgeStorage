@@ -1,0 +1,11 @@
+<Project>
+    <!-- Defaults target Windows. Copy to config.props and adjust the settings you need. -->
+    <PropertyGroup>
+        <!-- Linux / Steam / Proton: WinePath enables Wine, including Proton's bundled Wine-Mono. -->
+        <!-- <GamePath>/mnt/games/SteamLibrary/steamapps/common/Starfield</GamePath> -->
+        <!-- <WinePath>$(GamePath)/../Proton 11.0/files/bin/wine</WinePath> -->
+
+        <!-- Optional .NET host override for either mode. -->
+        <!-- <DotNetPath>dotnet</DotNetPath> -->
+    </PropertyGroup>
+</Project>

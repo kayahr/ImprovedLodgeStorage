@@ -1,0 +1,143 @@
+<Project>
+    <!-- Output paths must be configured before loading the SDK defaults. -->
+    <PropertyGroup>
+        <ModRoot>$(MSBuildThisFileDirectory)</ModRoot>
+        <ArtifactsPath>$(ModRoot)build/dotnet</ArtifactsPath>
+    </PropertyGroup>
+    <Import Project="$(ModRoot)config.props" Condition="Exists('$(ModRoot)config.props')" />
+    <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <!-- The generator runs through dotnet; no native executable wrapper is needed. -->
+        <UseAppHost>false</UseAppHost>
+        <TargetFramework>net10.0</TargetFramework>
+        <Version>1.0.0</Version>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Mutagen.Bethesda.Starfield" Version="0.54.0" />
+        <PackageReference Include="Mutagen.Bethesda.FormKeys.Starfield" Version="3.4.0" />
+    </ItemGroup>
+
+    <!-- Override tool locations through config.props or command-line properties. -->
+    <PropertyGroup>
+        <GamePath Condition="'$(GamePath)' == ''">$(MSBuildProgramFiles32)/Steam/steamapps/common/Starfield</GamePath>
+        <DotNetPath Condition="'$(DotNetPath)' == ''">dotnet</DotNetPath>
+
+        <ModName>ImprovedLodgeStorage</ModName>
+        <ModBuildDir>$(ModRoot)build</ModBuildDir>
+        <PluginFile>$(ModBuildDir)/$(ModName).esm</PluginFile>
+        <TextureArchive>$(ModBuildDir)/$(ModName) - Textures.ba2</TextureArchive>
+        <IconDir>$(ModBuildDir)/textures/Textures/Interface/WorkshopIcons/$(ModName).esm</IconDir>
+        <PackageDir>$(ModBuildDir)/package</PackageDir>
+        <PackageFile>$(ModBuildDir)/dist/$(ModName)-$(Version).zip</PackageFile>
+        <PapyrusCompiler>$(GamePath)/Tools/Papyrus Compiler/PapyrusCompiler.exe</PapyrusCompiler>
+        <PapyrusAssembler>$(GamePath)/Tools/Papyrus Compiler/PapyrusAssembler.exe</PapyrusAssembler>
+        <PapyrusFlags>$(GamePath)/Data/Scripts/Source/Starfield_Papyrus_Flags.flg</PapyrusFlags>
+        <TextureCompiler>$(GamePath)/Tools/AssetWatcher/Plugins/Starfield/xtexconv.exe</TextureCompiler>
+        <ArchivePacker>$(GamePath)/Tools/Archive2/Archive2.exe</ArchivePacker>
+    </PropertyGroup>
+
+    <!-- Without WinePath, run the Windows executables directly with native paths. -->
+    <PropertyGroup Condition="'$(WinePath)' != ''">
+        <ToolRunner>&quot;$(WinePath)&quot;</ToolRunner>
+        <ToolPathPrefix>Z:</ToolPathPrefix>
+        <WinePrefix>/tmp/wine-$(ModName)-$([System.Environment]::UserName)</WinePrefix>
+        <!-- WPF needs Proton's VKD3D DLLs on the Windows DLL search path. -->
+        <WineGraphicsPath>Z:$([System.IO.Path]::GetDirectoryName('$(WinePath)'))/../lib/vkd3d/x86_64-windows</WineGraphicsPath>
+        <WineEnvironment>WINEPREFIX=$(WinePrefix);WINEPATH=$(WineGraphicsPath);WINEDEBUG=-all;WINEDLLOVERRIDES=mshtml,winemenubuilder=</WineEnvironment>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ModBuildSettings Include="$(MSBuildProjectFullPath)" />
+        <ModBuildSettings Include="$(ModRoot)config.props" Condition="Exists('$(ModRoot)config.props')" />
+        <PapyrusSource Include="$(ModRoot)src/scripts/ILS/*.psc">
+            <Original>%(Identity)</Original>
+        </PapyrusSource>
+        <!-- FormIDs select the preview names required by Starfield's build menu. -->
+        <IconSource Include="$(ModRoot)src/textures/lodge-storage.png" FormID="0000080e" />
+        <IconSource Include="$(ModRoot)src/textures/ship-cargo.png" FormID="0000080f" />
+        <IconSource Update="@(IconSource)">
+            <Original>%(Identity)</Original>
+        </IconSource>
+        <IconOutput Include="@(IconSource->'$(IconDir)/%(FormID)cl.dds')" />
+        <ScriptOutput Include="@(PapyrusSource->'$(ModBuildDir)/Scripts/ILS/%(Filename).pex')" />
+        <ModOutput Include="$(PluginFile);$(TextureArchive);@(ScriptOutput)" />
+
+        <!-- Let IDE builds notice native source changes and missing outputs. -->
+        <UpToDateCheckBuilt Include="@(ScriptOutput);@(IconOutput)" />
+        <UpToDateCheckInput Include="$(GamePath)/Data/Starfield.esm" Set="Plugin" />
+        <UpToDateCheckOutput Include="$(PluginFile)" Set="Plugin" />
+        <UpToDateCheckInput Include="@(IconOutput)" Set="Textures" />
+        <UpToDateCheckOutput Include="$(TextureArchive)" Set="Textures" />
+        <UpToDateCheckInput Include="@(ModOutput);$(ModRoot)LICENSE.md" Set="Package" />
+        <UpToDateCheckOutput Include="$(PackageFile)" Set="Package" />
+    </ItemGroup>
+
+    <!-- A normal build includes the complete mod. Editor analysis only loads C#. -->
+    <Target Name="BuildMod" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'"
+            DependsOnTargets="GeneratePlugin;CompilePapyrus;ConvertIcons;PackTextures;PackageMod" />
+
+    <!-- Wine needs an owned directory before it can initialize a prefix in /tmp. -->
+    <Target Name="PrepareWine" BeforeTargets="CompilePapyrus;ConvertIcons;PackTextures"
+            Condition="'$(WinePath)' != ''">
+        <MakeDir Directories="$(WinePrefix)" />
+    </Target>
+
+    <Target Name="GeneratePlugin"
+            Inputs="$(TargetPath);$(GamePath)/Data/Starfield.esm;@(ModBuildSettings)"
+            Outputs="$(PluginFile)">
+        <Exec Command="&quot;$(DotNetPath)&quot; &quot;$(TargetPath)&quot; &quot;$(GamePath)/Data&quot; &quot;$(PluginFile)&quot;" />
+    </Target>
+
+    <!-- Target batching compiles only scripts whose PEX is missing or outdated. -->
+    <Target Name="CompilePapyrus"
+            Inputs="%(PapyrusSource.Identity);$(PapyrusCompiler);$(PapyrusAssembler);$(PapyrusFlags);@(ModBuildSettings)"
+            Outputs="$(ModBuildDir)/Scripts/ILS/%(PapyrusSource.Filename).pex">
+        <MakeDir Directories="$(ModBuildDir)/Scripts/ILS" />
+        <Exec EnvironmentVariables="$(WineEnvironment)"
+              Command="$(ToolRunner) &quot;$(PapyrusCompiler)&quot; &quot;ILS:%(PapyrusSource.Filename)&quot; &quot;-i=$(ToolPathPrefix)$(ModRoot)src/scripts;$(ToolPathPrefix)$(GamePath)/Data/Scripts/Source&quot; &quot;-f=$(ToolPathPrefix)$(PapyrusFlags)&quot; &quot;-o=$(ToolPathPrefix)$(ModBuildDir)/Scripts&quot; -ignorecwd -release -optimize" />
+    </Target>
+
+    <Target Name="ConvertIcons"
+            Inputs="%(IconSource.Identity);$(TextureCompiler);@(ModBuildSettings)"
+            Outputs="$(IconDir)/%(IconSource.FormID)cl.dds">
+        <MakeDir Directories="$(IconDir)" />
+        <Exec EnvironmentVariables="$(WineEnvironment)"
+              WorkingDirectory="$(ModRoot)src/textures"
+              Command="$(ToolRunner) &quot;$(TextureCompiler)&quot; -nologo -ft dds -f BC7_UNORM -w 128 -h 128 -m 1 -if BOX -srgbnoconvert -y -o &quot;$(ToolPathPrefix)$(IconDir)&quot; &quot;%(IconSource.Filename)%(IconSource.Extension)&quot;" />
+        <Move SourceFiles="$(IconDir)/%(IconSource.Filename).dds" DestinationFiles="$(IconDir)/%(IconSource.FormID)cl.dds" />
+    </Target>
+
+    <Target Name="PackTextures" DependsOnTargets="ConvertIcons"
+            Inputs="@(IconOutput);$(ArchivePacker);$(GamePath)/Tools/Archive2/Archive2Interop.dll;@(ModBuildSettings)" Outputs="$(TextureArchive)">
+        <Exec EnvironmentVariables="$(WineEnvironment)"
+              Command="$(ToolRunner) &quot;$(ArchivePacker)&quot; &quot;$(ToolPathPrefix)$(ModBuildDir)/textures&quot; &quot;-create=$(ToolPathPrefix)$(TextureArchive)&quot; &quot;-root=$(ToolPathPrefix)$(ModBuildDir)/textures&quot; -format=DDS" />
+    </Target>
+
+    <!-- Stage only installable files and the license, then use MSBuild's ZIP task. -->
+    <Target Name="PackageMod"
+            Inputs="@(ModOutput);$(ModRoot)LICENSE.md;@(ModBuildSettings)" Outputs="$(PackageFile)">
+        <RemoveDir Directories="$(PackageDir)" />
+        <MakeDir Directories="$(PackageDir);$(ModBuildDir)/dist" />
+        <Copy SourceFiles="$(PluginFile);$(TextureArchive);$(ModRoot)LICENSE.md" DestinationFolder="$(PackageDir)" />
+        <Copy SourceFiles="@(ScriptOutput)" DestinationFolder="$(PackageDir)/Scripts/ILS" />
+        <ZipDirectory SourceDirectory="$(PackageDir)" DestinationFile="$(PackageFile)" Overwrite="true" />
+        <Message Text="Distribution: $(PackageFile)" Importance="high" />
+    </Target>
+
+    <!-- Rebuild must retain the NuGet assets restored before its Clean step. -->
+    <Target Name="PrepareModRebuild" BeforeTargets="BeforeRebuild">
+        <PropertyGroup>
+            <ModRebuilding>true</ModRebuilding>
+        </PropertyGroup>
+    </Target>
+
+    <Target Name="CleanMod" AfterTargets="Clean">
+        <RemoveDir Directories="$(ModBuildDir)" Condition="'$(ModRebuilding)' != 'true'" />
+        <Delete Files="@(ModOutput);@(IconOutput)" Condition="'$(ModRebuilding)' == 'true'" />
+    </Target>
+    <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>
