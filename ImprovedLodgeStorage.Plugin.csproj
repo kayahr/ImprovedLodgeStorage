@@ -72,7 +72,7 @@
         <UpToDateCheckOutput Include="$(PluginFile)" Set="Plugin" />
         <UpToDateCheckInput Include="@(IconOutput)" Set="Textures" />
         <UpToDateCheckOutput Include="$(TextureArchive)" Set="Textures" />
-        <UpToDateCheckInput Include="@(ModOutput);$(ModRoot)LICENSE.md" Set="Package" />
+        <UpToDateCheckInput Include="@(ModOutput)" Set="Package" />
         <UpToDateCheckOutput Include="$(PackageFile)" Set="Package" />
     </ItemGroup>
 
@@ -117,12 +117,12 @@
               Command="$(ToolRunner) &quot;$(ArchivePacker)&quot; &quot;$(ToolPathPrefix)$(ModBuildDir)/textures&quot; &quot;-create=$(ToolPathPrefix)$(TextureArchive)&quot; &quot;-root=$(ToolPathPrefix)$(ModBuildDir)/textures&quot; -format=DDS" />
     </Target>
 
-    <!-- Stage only installable files and the license, then use MSBuild's ZIP task. -->
+    <!-- Stage only installable files, then use MSBuild's ZIP task. -->
     <Target Name="PackageMod"
-            Inputs="@(ModOutput);$(ModRoot)LICENSE.md;@(ModBuildSettings)" Outputs="$(PackageFile)">
+            Inputs="@(ModOutput);@(ModBuildSettings)" Outputs="$(PackageFile)">
         <RemoveDir Directories="$(PackageDir)" />
         <MakeDir Directories="$(PackageDir);$(ModBuildDir)/dist" />
-        <Copy SourceFiles="$(PluginFile);$(TextureArchive);$(ModRoot)LICENSE.md" DestinationFolder="$(PackageDir)" />
+        <Copy SourceFiles="$(PluginFile);$(TextureArchive)" DestinationFolder="$(PackageDir)" />
         <Copy SourceFiles="@(ScriptOutput)" DestinationFolder="$(PackageDir)/Scripts/ILS" />
         <ZipDirectory SourceDirectory="$(PackageDir)" DestinationFile="$(PackageFile)" Overwrite="true" />
         <Message Text="Distribution: $(PackageFile)" Importance="high" />
