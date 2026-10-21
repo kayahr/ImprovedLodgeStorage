@@ -12,7 +12,7 @@
         <!-- The generator runs through dotnet; no native executable wrapper is needed. -->
         <UseAppHost>false</UseAppHost>
         <TargetFramework>net10.0</TargetFramework>
-        <Version>1.0.1</Version>
+        <Version>1.0.2</Version>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
@@ -29,6 +29,7 @@
         <ModName>ImprovedLodgeStorage</ModName>
         <ModBuildDir>$(ModRoot)build</ModBuildDir>
         <PluginFile>$(ModBuildDir)/$(ModName).esm</PluginFile>
+        <ScriptArchive>$(ModBuildDir)/$(ModName) - Main.ba2</ScriptArchive>
         <TextureArchive>$(ModBuildDir)/$(ModName) - Textures.ba2</TextureArchive>
         <IconDir>$(ModBuildDir)/textures/Textures/Interface/WorkshopIcons/$(ModName).esm</IconDir>
         <PackageDir>$(ModBuildDir)/package</PackageDir>
@@ -64,12 +65,14 @@
         </IconSource>
         <IconOutput Include="@(IconSource->'$(IconDir)/%(FormID)cl.dds')" />
         <ScriptOutput Include="@(PapyrusSource->'$(ModBuildDir)/Scripts/ILS/%(Filename).pex')" />
-        <ModOutput Include="$(PluginFile);$(TextureArchive);@(ScriptOutput)" />
+        <ModOutput Include="$(PluginFile);$(ScriptArchive);$(TextureArchive)" />
 
         <!-- Let IDE builds notice native source changes and missing outputs. -->
         <UpToDateCheckBuilt Include="@(ScriptOutput);@(IconOutput)" />
         <UpToDateCheckInput Include="$(GamePath)/Data/Starfield.esm" Set="Plugin" />
         <UpToDateCheckOutput Include="$(PluginFile)" Set="Plugin" />
+        <UpToDateCheckInput Include="@(ScriptOutput)" Set="Scripts" />
+        <UpToDateCheckOutput Include="$(ScriptArchive)" Set="Scripts" />
         <UpToDateCheckInput Include="@(IconOutput)" Set="Textures" />
         <UpToDateCheckOutput Include="$(TextureArchive)" Set="Textures" />
         <UpToDateCheckInput Include="@(ModOutput)" Set="Package" />
@@ -78,10 +81,10 @@
 
     <!-- A normal build includes the complete mod. Editor analysis only loads C#. -->
     <Target Name="BuildMod" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'"
-            DependsOnTargets="GeneratePlugin;CompilePapyrus;ConvertIcons;PackTextures;PackageMod" />
+            DependsOnTargets="GeneratePlugin;PackScripts;PackTextures;PackageMod" />
 
     <!-- Wine needs an owned directory before it can initialize a prefix in /tmp. -->
-    <Target Name="PrepareWine" BeforeTargets="CompilePapyrus;ConvertIcons;PackTextures"
+    <Target Name="PrepareWine" BeforeTargets="CompilePapyrus;PackScripts;ConvertIcons;PackTextures"
             Condition="'$(WinePath)' != ''">
         <MakeDir Directories="$(WinePrefix)" />
     </Target>
@@ -99,6 +102,14 @@
         <MakeDir Directories="$(ModBuildDir)/Scripts/ILS" />
         <Exec EnvironmentVariables="$(WineEnvironment)"
               Command="$(ToolRunner) &quot;$(PapyrusCompiler)&quot; &quot;ILS:%(PapyrusSource.Filename)&quot; &quot;-i=$(ToolPathPrefix)$(ModRoot)src/scripts;$(ToolPathPrefix)$(GamePath)/Data/Scripts/Source&quot; &quot;-f=$(ToolPathPrefix)$(PapyrusFlags)&quot; &quot;-o=$(ToolPathPrefix)$(ModBuildDir)/Scripts&quot; -ignorecwd -release -optimize" />
+    </Target>
+
+    <!-- Ship scripts in a General archive so players do not need loose-file INI settings. -->
+    <Target Name="PackScripts" DependsOnTargets="CompilePapyrus"
+            Inputs="@(ScriptOutput);$(ArchivePacker);$(GamePath)/Tools/Archive2/Archive2Interop.dll;@(ModBuildSettings)"
+            Outputs="$(ScriptArchive)">
+        <Exec EnvironmentVariables="$(WineEnvironment)"
+              Command="$(ToolRunner) &quot;$(ArchivePacker)&quot; &quot;$(ToolPathPrefix)$(ModBuildDir)/Scripts&quot; &quot;-create=$(ToolPathPrefix)$(ScriptArchive)&quot; &quot;-root=$(ToolPathPrefix)$(ModBuildDir)&quot; -format=General -compression=None" />
     </Target>
 
     <Target Name="ConvertIcons"
@@ -122,8 +133,7 @@
             Inputs="@(ModOutput);@(ModBuildSettings)" Outputs="$(PackageFile)">
         <RemoveDir Directories="$(PackageDir)" />
         <MakeDir Directories="$(PackageDir);$(ModBuildDir)/dist" />
-        <Copy SourceFiles="$(PluginFile);$(TextureArchive)" DestinationFolder="$(PackageDir)" />
-        <Copy SourceFiles="@(ScriptOutput)" DestinationFolder="$(PackageDir)/Scripts/ILS" />
+        <Copy SourceFiles="@(ModOutput)" DestinationFolder="$(PackageDir)" />
         <ZipDirectory SourceDirectory="$(PackageDir)" DestinationFile="$(PackageFile)" Overwrite="true" />
         <Message Text="Distribution: $(PackageFile)" Importance="high" />
     </Target>
@@ -137,7 +147,7 @@
 
     <Target Name="CleanMod" AfterTargets="Clean">
         <RemoveDir Directories="$(ModBuildDir)" Condition="'$(ModRebuilding)' != 'true'" />
-        <Delete Files="@(ModOutput);@(IconOutput)" Condition="'$(ModRebuilding)' == 'true'" />
+        <Delete Files="@(ModOutput);@(ScriptOutput);@(IconOutput)" Condition="'$(ModRebuilding)' == 'true'" />
     </Target>
     <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
 </Project>
