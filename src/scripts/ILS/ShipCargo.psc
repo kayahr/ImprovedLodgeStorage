@@ -15,7 +15,6 @@ Event OnActivate(ObjectReference akActionRef)
     SpaceshipReference homeShip = Game.GetPlayerHomeSpaceShip()
     If homeShip == None
         Opening = False
-        Debug.MessageBox("Ship Cargo: no home ship is available.")
         Return
     EndIf
     ; Leave a paused menu context while preserving the player's position.

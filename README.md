@@ -1,6 +1,6 @@
 # Improved Lodge Storage
 
-Starfield mod providing shared access to the Lodge bedroom safe, storage links for the Lodge basement's crafting stations, ship cargo access, and buildable storage access points for homes and outposts.
+Starfield mod providing shared access to the Lodge bedroom safe, crafting from Lodge storage, ship cargo access, and buildable storage access points for homes and outposts. Building a Lodge Storage access point also makes its resources available for crafting, research, and construction in the same home or outpost while those menus are open. Existing workbench links and other resource containers are left intact.
 
 <p>
     <a href="src/screenshots/lodge.webp"><img src="src/screenshots/lodge.webp" alt="Lodge storage access points" width="32%"></a>

@@ -51,11 +51,13 @@ internal abstract class BuildableStorageAccess
 
     /// <summary>Adds the access point, wall attachment and free recipe for homes and outposts.</summary>
     /// <param name="mod">Plugin receiving the activator, snap template and construction recipe.</param>
-    public void Build(StarfieldMod mod)
+    /// <returns>The newly added buildable activator.</returns>
+    public virtual AccessActivator Build(StarfieldMod mod)
     {
         var snap = BuildWallSnap(mod);
         var result = access.BuildBuildable(mod, snap);
         BuildRecipe(mod, result);
+        return result;
     }
 
     /// <summary>Adds this access point's wall attachment template.</summary>

@@ -23,6 +23,10 @@ internal abstract class ClosableStorageAccess : StorageAccess
     protected override ScriptEntry BuildScript()
     {
         // The handler closes animated access points by default.
-        return new ScriptEntry { Name = "ILS:StorageAccess" };
+        var script = new ScriptEntry { Name = "ILS:StorageAccess" };
+        var inventory = new ScriptObjectProperty { Name = "LodgeInventory" };
+        inventory.Object.SetTo(Forms.BedroomInventory);
+        script.Properties.Add(inventory);
+        return script;
     }
 }

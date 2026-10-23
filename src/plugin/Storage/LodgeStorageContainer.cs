@@ -23,11 +23,14 @@ internal sealed class LodgeStorageContainer : StorageAccess
     /// <returns>A new Lodge storage script entry configured for a model without an animated door.</returns>
     protected override ScriptEntry BuildScript()
     {
+        var inventory = new ScriptObjectProperty { Name = "LodgeInventory" };
+        inventory.Object.SetTo(Forms.BedroomInventory);
         return new ScriptEntry
         {
             Name = "ILS:StorageAccess",
             Properties =
             {
+                inventory,
                 new ScriptBoolProperty { Name = "CloseDoorOnExit", Data = false }
             }
         };

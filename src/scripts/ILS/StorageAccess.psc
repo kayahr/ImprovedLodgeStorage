@@ -2,11 +2,39 @@ Scriptname ILS:StorageAccess Extends ObjectReference
 
 ; Shared Lodge inventory access for fixed and player-built access points.
 ; Items remain in the original bedroom safe; animated access points close on exit.
+ObjectReference Property LodgeInventory Auto Const Mandatory
 Bool Property CloseDoorOnExit = True Auto Const
+
+; Only player-built access points participate in local crafting and building.
+ILS:WorkshopCrafting Property Controller Auto Const
 
 ; Track inventory-menu events and reject overlapping activation requests.
 Bool LastMenuOpened
 Bool Opening
+ObjectReference Workshop
+
+Event OnLoad()
+    WatchWorkshop()
+EndEvent
+
+Event OnWorkshopObjectPlaced(ObjectReference akReference)
+    WatchWorkshop(True)
+EndEvent
+
+Event OnUnload()
+    If Workshop != None && Controller != None
+        Controller.RefreshWorkshop(Workshop)
+    EndIf
+EndEvent
+
+; Fixed access points only open storage; player-built ones also enable local resources.
+Function WatchWorkshop(Bool placed = False)
+    If Controller == None
+        Return
+    EndIf
+    Workshop = GetWorkshop()
+    Controller.WatchWorkshop(Workshop, Self, placed)
+EndFunction
 
 Event OnActivate(ObjectReference akActionRef)
     ; Only player activations may open the shared storage.
@@ -16,11 +44,8 @@ Event OnActivate(ObjectReference akActionRef)
     EndIf
     Opening = True
     LastMenuOpened = False
-    ; Resolve the vanilla inventory independently of this mod's load-order slot.
-    ObjectReference safe = Game.GetFormFromFile(0x00266E81, "Starfield.esm") as ObjectReference
-    If safe == None
+    If LodgeInventory == None
         Opening = False
-        Debug.MessageBox("Improved Lodge Storage: bedroom safe 00266E81 was not found.")
         Return
     EndIf
     ; Access points without a door opt out of the closing animation.
@@ -36,24 +61,19 @@ Event OnActivate(ObjectReference akActionRef)
     ; focused object's activation route can intercept the container request.
     ; Hide its activation prompt only for this call, then restore both flags.
     BlockActivation(True, True)
-    Bool activated = safe.Activate(player)
+    LodgeInventory.Activate(player)
     BlockActivation(False)
     Opening = False
-    If !activated
-        Debug.MessageBox("Improved Lodge Storage: the bedroom safe rejected activation.")
-    EndIf
 EndEvent
 
 Event OnMenuOpenCloseEvent(String asMenuName, Bool abOpening)
     ; Close our own door only after an actual inventory open/close cycle.
-    If asMenuName == "ContainerMenu"
-        If abOpening
-            LastMenuOpened = True
-        ElseIf LastMenuOpened
-            ; Both the bedroom safe and Captain's Locker use SimpleOpenClose01.
-            ; Close their graph without another activation.
-            PlayAnimation("Close")
-            UnregisterForMenuOpenCloseEvent("ContainerMenu")
-        EndIf
+    If abOpening
+        LastMenuOpened = True
+    ElseIf LastMenuOpened
+        ; Both the bedroom safe and Captain's Locker use SimpleOpenClose01.
+        ; Close their graph without another activation.
+        PlayAnimation("Close")
+        UnregisterForMenuOpenCloseEvent("ContainerMenu")
     EndIf
 EndEvent

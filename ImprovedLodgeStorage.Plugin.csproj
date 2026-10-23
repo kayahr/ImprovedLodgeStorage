@@ -12,7 +12,7 @@
         <!-- The generator runs through dotnet; no native executable wrapper is needed. -->
         <UseAppHost>false</UseAppHost>
         <TargetFramework>net10.0</TargetFramework>
-        <Version>1.0.2</Version>
+        <Version>1.1.0</Version>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
@@ -54,15 +54,10 @@
     <ItemGroup>
         <ModBuildSettings Include="$(MSBuildProjectFullPath)" />
         <ModBuildSettings Include="$(ModRoot)config.props" Condition="Exists('$(ModRoot)config.props')" />
-        <PapyrusSource Include="$(ModRoot)src/scripts/ILS/*.psc">
-            <Original>%(Identity)</Original>
-        </PapyrusSource>
+        <PapyrusSource Include="$(ModRoot)src/scripts/ILS/*.psc" />
         <!-- FormIDs select the preview names required by Starfield's build menu. -->
         <IconSource Include="$(ModRoot)src/textures/lodge-storage.png" FormID="0000080e" />
         <IconSource Include="$(ModRoot)src/textures/ship-cargo.png" FormID="0000080f" />
-        <IconSource Update="@(IconSource)">
-            <Original>%(Identity)</Original>
-        </IconSource>
         <IconOutput Include="@(IconSource->'$(IconDir)/%(FormID)cl.dds')" />
         <ScriptOutput Include="@(PapyrusSource->'$(ModBuildDir)/Scripts/ILS/%(Filename).pex')" />
         <ModOutput Include="$(PluginFile);$(ScriptArchive);$(TextureArchive)" />
@@ -101,6 +96,7 @@
             Outputs="$(ModBuildDir)/Scripts/ILS/%(PapyrusSource.Filename).pex">
         <MakeDir Directories="$(ModBuildDir)/Scripts/ILS" />
         <Exec EnvironmentVariables="$(WineEnvironment)"
+              CustomErrorRegularExpression="^No output generated.*|^Failed on .+"
               Command="$(ToolRunner) &quot;$(PapyrusCompiler)&quot; &quot;ILS:%(PapyrusSource.Filename)&quot; &quot;-i=$(ToolPathPrefix)$(ModRoot)src/scripts;$(ToolPathPrefix)$(GamePath)/Data/Scripts/Source&quot; &quot;-f=$(ToolPathPrefix)$(PapyrusFlags)&quot; &quot;-o=$(ToolPathPrefix)$(ModBuildDir)/Scripts&quot; -ignorecwd -release -optimize" />
     </Target>
 

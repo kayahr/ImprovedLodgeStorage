@@ -22,6 +22,7 @@ internal static class Forms
     public static FormKey Vanilla(uint id) => new(Starfield.ModKey, id);
 
     // Original placed references without named entries in the FormKeys registry
+    public static readonly FormKey PlayerReference = Vanilla(0x14);
     public static readonly FormKey BedroomInventory = Vanilla(0x266E81);
     public static readonly FormKey[] LodgeWorkbenches =
     [
@@ -50,4 +51,9 @@ internal static class Forms
     public static readonly FormKey CargoRecipe = Own(0x811);
     public static readonly FormKey StorageWallSnap = Own(0x812);
     public static readonly FormKey CargoWallSnap = Own(0x813);
+
+    // Controller and activation override for temporary crafting/building resources
+    public static readonly FormKey WorkshopCrafting = Own(0x814);
+    public static readonly FormKey WorkbenchActivation = Own(0x815);
+    public static readonly FormKey WorkshopAccessPointLink = Own(0x816);
 }

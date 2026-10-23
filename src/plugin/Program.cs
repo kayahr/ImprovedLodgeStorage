@@ -3,6 +3,7 @@
 
 using ImprovedLodgeStorage.Buildables;
 using ImprovedLodgeStorage.Locations;
+using ImprovedLodgeStorage.Workshops;
 using Mutagen.Bethesda.FormKeys.Starfield;
 using Mutagen.Bethesda.Starfield;
 
@@ -45,6 +46,7 @@ internal static class Program
         new Spaceport(mod, game).Build();
         new BuildableLodgeStorageLocker(game).Build(mod);
         new BuildableShipCargoPanel(game).Build(mod);
+        new WorkshopCrafting().Build(mod);
 
         // Write ESM file
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args[1]))!);

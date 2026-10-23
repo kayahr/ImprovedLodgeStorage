@@ -4,6 +4,7 @@
 using ImprovedLodgeStorage.Storage;
 using Mutagen.Bethesda.Starfield;
 using Noggog;
+using AccessActivator = Mutagen.Bethesda.Starfield.Activator;
 
 namespace ImprovedLodgeStorage.Buildables;
 
@@ -27,5 +28,17 @@ internal sealed class BuildableLodgeStorageLocker : BuildableStorageAccess
             description: "Access your unlimited Lodge storage.",
             menuOrder: 100)
     {
+    }
+
+    /// <summary>Builds the Lodge locker and connects its script to the workshop controller.</summary>
+    /// <param name="mod">Plugin receiving the activator, wall attachment and free recipe.</param>
+    /// <returns>The buildable locker with local crafting and building support.</returns>
+    public override AccessActivator Build(StarfieldMod mod)
+    {
+        var result = base.Build(mod);
+        var controller = new ScriptObjectProperty { Name = "Controller" };
+        controller.Object.SetTo(Forms.WorkshopCrafting);
+        result.VirtualMachineAdapter!.Scripts[0].Properties.Add(controller);
+        return result;
     }
 }
