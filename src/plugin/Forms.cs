@@ -56,4 +56,5 @@ internal static class Forms
     public static readonly FormKey WorkshopCrafting = Own(0x814);
     public static readonly FormKey WorkbenchActivation = Own(0x815);
     public static readonly FormKey WorkshopAccessPointLink = Own(0x816);
+    public static readonly FormKey ShipAccessPointLink = Own(0x817);
 }

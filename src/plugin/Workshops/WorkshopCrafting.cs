@@ -7,10 +7,10 @@ using Mutagen.Bethesda.Starfield;
 
 namespace ImprovedLodgeStorage.Workshops;
 
-/// <summary>Builds temporary Lodge resource access for crafting and building in homes and outposts.</summary>
+/// <summary>Builds temporary Lodge resource access for homes, outposts and ship workbenches.</summary>
 internal sealed class WorkshopCrafting
 {
-    /// <summary>Adds a hidden controller and a perk replacing player-built workbench activation.</summary>
+    /// <summary>Adds a hidden controller and a perk handling workshop and home-ship workbenches.</summary>
     /// <param name="mod">Plugin receiving the controller quest and activation perk.</param>
     public void Build(StarfieldMod mod)
     {
@@ -19,12 +19,18 @@ internal sealed class WorkshopCrafting
         {
             EditorID = "ILS_WorkshopAccessPointLink"
         });
+        mod.Keywords.Add(new Keyword(Forms.ShipAccessPointLink, StarfieldRelease.Starfield)
+        {
+            EditorID = "ILS_ShipAccessPointLink"
+        });
 
         var script = new ScriptEntry { Name = "ILS:WorkshopCrafting" };
         script.Properties.Add(Property("LodgeInventory", Forms.BedroomInventory));
         script.Properties.Add(Property("WorkshopItemKeyword", Starfield.Keyword.WorkshopItemKeyword.FormKey));
+        script.Properties.Add(Property("WorkbenchContainerKeyword", Starfield.Keyword.LinkedWorkbenchContainerKeyword.FormKey));
         script.Properties.Add(Property("BuildContainerValue", Starfield.ActorValueInformation.OutpostBuildContainer.FormKey));
         script.Properties.Add(Property("AccessPointLink", Forms.WorkshopAccessPointLink));
+        script.Properties.Add(Property("ShipAccessPointLink", Forms.ShipAccessPointLink));
         script.Properties.Add(Property("ActivationPerk", Forms.WorkbenchActivation));
 
         var player = new QuestReferenceAlias
@@ -61,6 +67,9 @@ internal sealed class WorkshopCrafting
         // Target conditions apply to current and future workshop furniture without editing its records.
         var workbench = new HasKeywordConditionData();
         workbench.FirstParameter.Link.SetTo(Starfield.Keyword.AnimFurnWorkbench.FormKey);
+        // Built-in ship kitchens use the general crafting keyword without the animation keyword.
+        var generalWorkbench = new HasKeywordConditionData();
+        generalWorkbench.FirstParameter.Link.SetTo(Starfield.Keyword.WorkbenchGeneralKeyword.FormKey);
         var workshopItem = new HasLinkedRefConditionData();
         workshopItem.FirstParameter.Link.SetTo(Starfield.Keyword.WorkshopItemKeyword.FormKey);
         var activation = new PerkEntryPointAddActivateChoice
@@ -78,8 +87,10 @@ internal sealed class WorkshopCrafting
                     RunOnTabIndex = 1, // The activated target; tab 0 is the perk owner.
                     Conditions =
                     {
-                        new ConditionFloat { ComparisonValue = 1, Data = workbench },
-                        new ConditionFloat { ComparisonValue = 1, Data = workshopItem }
+                        new ConditionFloat { ComparisonValue = 1, Data = workbench, Flags = Condition.Flag.OR },
+                        new ConditionFloat { ComparisonValue = 1, Data = generalWorkbench },
+                        new ConditionFloat { ComparisonValue = 1, Data = workshopItem, Flags = Condition.Flag.OR },
+                        new ConditionFloat { ComparisonValue = 1, Data = new IsOnPlayerHomeSpaceShipConditionData() }
                     }
                 }
             }

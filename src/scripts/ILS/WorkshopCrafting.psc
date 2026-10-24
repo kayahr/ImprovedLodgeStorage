@@ -1,10 +1,12 @@
 Scriptname ILS:WorkshopCrafting Extends Quest
 
-; Temporarily include the Lodge safe in a home/outpost's native resource pool.
+; Temporarily supply Lodge resources to homes, outposts and ship workbenches.
 ObjectReference Property LodgeInventory Auto Const
 Keyword Property WorkshopItemKeyword Auto Const
+Keyword Property WorkbenchContainerKeyword Auto Const Mandatory
 ActorValue Property BuildContainerValue Auto Const
 Keyword Property AccessPointLink Auto Const Mandatory
+Keyword Property ShipAccessPointLink Auto Const Mandatory
 Perk Property ActivationPerk Auto Const Mandatory
 
 Bool Initialized
@@ -12,6 +14,7 @@ Bool WorkbenchActive
 Bool OpeningWorkbench
 ObjectReference BuildingWorkshop
 ObjectReference ConnectedWorkshop
+ObjectReference ConnectedWorkbench
 ObjectReference PreviousWorkshop
 Float PreviousBuildContainerValue
 
@@ -41,6 +44,37 @@ Function Initialize(Bool reload = False)
     RegisterForMenuOpenCloseEvent("ResearchMenu")
 EndFunction
 
+; Built-in ship furniture may lack the workshop link carried by decorated objects.
+ObjectReference Function GetWorkshopFor(ObjectReference item)
+    ObjectReference workshop = item.GetWorkshop()
+    If workshop == None
+        workshop = item.GetLinkedRef(WorkshopItemKeyword)
+    EndIf
+    If workshop == None
+        workshop = item.GetLinkedRef(AccessPointLink)
+    EndIf
+    If workshop == None
+        SpaceshipReference ship = item.GetCurrentShipRef()
+        If ship != None && ship == Game.GetPlayerHomeSpaceShip()
+            ; The ship quest's workshop alias can be empty. Our access points
+            ; retain their actual workshop and index themselves by their ship.
+            ObjectReference[] points = ship.GetRefsLinkedToMe(ShipAccessPointLink)
+            Int index = 0
+            While index < points.Length
+                ObjectReference point = points[index]
+                If point != None && !point.IsDeleted() && !point.IsDisabled()
+                    workshop = point.GetLinkedRef(AccessPointLink)
+                    If workshop != None
+                        Return workshop
+                    EndIf
+                EndIf
+                index += 1
+            EndWhile
+        EndIf
+    EndIf
+    Return workshop
+EndFunction
+
 ; Access points discover their actual workshop, including dynamically created outposts.
 Function WatchWorkshop(ObjectReference workshop, ObjectReference accessPoint, Bool placed = False)
     Initialize()
@@ -49,6 +83,7 @@ Function WatchWorkshop(ObjectReference workshop, ObjectReference accessPoint, Bo
     EndIf
     ; This index link belongs to our own object and disappears with that object.
     accessPoint.SetLinkedRef(workshop, AccessPointLink)
+    accessPoint.SetLinkedRef(accessPoint.GetCurrentShipRef(), ShipAccessPointLink)
     RegisterForRemoteEvent(workshop, "OnWorkshopMode")
     RegisterForRemoteEvent(workshop, "OnWorkshopObjectRemoved")
     RegisterForRemoteEvent(workshop, "OnObjectDestroyed")
@@ -67,22 +102,34 @@ Function OpenWorkbench(ObjectReference workbench)
     EndIf
     ; Guard only this call. A rejected activation must not block other workbenches.
     OpeningWorkbench = True
-    ; Leave activation blocks owned by the game or another mod untouched.
-    If workbench.IsActivationBlocked()
-        OpeningWorkbench = False
-        Return
+    ; Blocked furniture may still rely on OnActivate. Forward that activation
+    ; normally, without supplying resources or changing another mod's block.
+    If !workbench.IsActivationBlocked()
+        WorkbenchActive = True
+        ObjectReference workshop = workbench.GetWorkshop()
+        If workshop == None
+            workshop = workbench.GetLinkedRef(WorkshopItemKeyword)
+        EndIf
+        SpaceshipReference ship = workbench.GetCurrentShipRef()
+        If workshop == None && ship != None && ship == Game.GetPlayerHomeSpaceShip()
+            workshop = GetWorkshopFor(workbench)
+            DisconnectStorage()
+            ; Only ship furniture without a workshop assignment needs a direct link.
+            ; Add a direct link only when free, and remove only the link created here.
+            If HasLodgeAccessPoint(workshop) && LodgeInventory != None && workbench.GetLinkedRef(WorkbenchContainerKeyword) == None
+                ConnectedWorkbench = workbench
+                workbench.SetLinkedRef(LodgeInventory, WorkbenchContainerKeyword)
+            EndIf
+        Else
+            ConnectStorage(workshop)
+        EndIf
     EndIf
-    WorkbenchActive = True
-    ObjectReference workshop = workbench.GetWorkshop()
-    If workshop == None
-        workshop = workbench.GetLinkedRef(WorkshopItemKeyword)
-    EndIf
-    ConnectStorage(workshop)
-    ; Hide the perk interaction while forwarding to the furniture's native activation.
-    ; Default processing bypasses our temporary block and handles the occupying NPC.
-    workbench.BlockActivation(True, True)
-    Bool activated = workbench.Activate(Game.GetPlayer(), True)
-    workbench.BlockActivation(False)
+    ; Suspend only our perk to avoid intercepting this forwarded activation.
+    ; Normal processing sends OnActivate and preserves other mods' activation paths.
+    Actor player = Game.GetPlayer()
+    player.RemovePerk(ActivationPerk)
+    Bool activated = workbench.Activate(player)
+    player.AddPerk(ActivationPerk)
     If !activated
         WorkbenchActive = False
         DisconnectStorage()
@@ -113,6 +160,7 @@ Event ObjectReference.OnWorkshopObjectRemoved(ObjectReference akSender, ObjectRe
     ; Remove our index entry before checking whether another access point remains.
     If akReference != None && akReference.GetLinkedRef(AccessPointLink) == akSender
         akReference.SetLinkedRef(None, AccessPointLink)
+        akReference.SetLinkedRef(None, ShipAccessPointLink)
     EndIf
     RefreshWorkshop(akSender)
 EndEvent
@@ -153,8 +201,13 @@ Function ConnectStorage(ObjectReference workshop)
     LodgeInventory.SetLinkedRef(workshop, WorkshopItemKeyword)
 EndFunction
 
-; Restore only the safe's temporary registration. Its inventory never moves.
+; Remove our temporary ship-workbench link and restore the safe's resource registration.
 Function DisconnectStorage()
+    ObjectReference workbench = ConnectedWorkbench
+    ConnectedWorkbench = None
+    If workbench != None && workbench.GetLinkedRef(WorkbenchContainerKeyword) == LodgeInventory
+        workbench.SetLinkedRef(None, WorkbenchContainerKeyword)
+    EndIf
     ObjectReference workshop = ConnectedWorkshop
     If workshop == None
         Return

@@ -32,7 +32,7 @@ Function WatchWorkshop(Bool placed = False)
     If Controller == None
         Return
     EndIf
-    Workshop = GetWorkshop()
+    Workshop = Controller.GetWorkshopFor(Self)
     Controller.WatchWorkshop(Workshop, Self, placed)
 EndFunction
 
